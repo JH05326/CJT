@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仪器故障诊断系统</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #0f172a; color: #cbd5e1; height: 100vh; display: flex; overflow: hidden; }
+.sidebar { width: 240px; min-width: 240px; background: #1e293b; display: flex; flex-direction: column; border-right: 1px solid #334155; overflow: hidden; }
+.sidebar-brand { padding: 20px 18px 16px; border-bottom: 1px solid #334155; }
+.sidebar-brand h1 { font-size: 17px; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
+.sidebar-brand p { font-size: 12px; color: #64748b; margin-top: 4px; }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 0; }
+.nav-section-title { padding: 12px 18px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; font-size: 14px; color: #94a3b8; transition: all 0.15s; border-left: 3px solid transparent; }
+.nav-item:hover { background: #334155; color: #e2e8f0; }
+.nav-item.active { background: rgba(59, 130, 246, 0.12); color: #60a5fa; border-left-color: #3b82f6; }
+.nav-icon { font-size: 16px; width: 22px; text-align: center; }
+.nav-count { margin-left: auto; background: #334155; color: #64748b; font-size: 11px; padding: 1px 8px; border-radius: 10px; }
+.nav-item.active .nav-count { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.toolbar { padding: 16px 24px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 16px; align-items: center; }
+.search-box { flex: 1; position: relative; }
+.search-box input { width: 100%; padding: 10px 14px 10px 40px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; transition: border-color 0.2s; }
+.search-box input::placeholder { color: #475569; }
+.search-box input:focus { border-color: #3b82f6; }
+.search-box::before { content: "\1F50D"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+.mode-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+.mode-btn:hover { background: #334155; color: #e2e8f0; }
+.mode-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+.toolbar-stats { font-size: 13px; color: #64748b; white-space: nowrap; }
+.toolbar-stats span { color: #60a5fa; font-weight: 600; }
+.content-area { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.fault-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; margin-bottom: 10px; overflow: hidden; transition: border-color 0.2s; }
+.fault-card:hover { border-color: #475569; }
+.fault-card.open { border-color: #3b82f6; }
+.fault-card-header { padding: 14px 18px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fault-card-header:hover { background: #283548; }
+.fault-card-left { flex: 1; min-width: 0; }
+.fault-title { font-size: 15px; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fault-meta { display: flex; gap: 8px; margin-top: 6px; align-items: center; flex-wrap: wrap; }
+.fault-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.badge-gc { background: #1e3a5f; color: #60a5fa; }
+.badge-hplc { background: #1a3d2f; color: #34d399; }
+.badge-icp { background: #3b1f5e; color: #a78bfa; }
+.badge-toc { background: #3b3518; color: #fbbf24; }
+.badge-uv { background: #3b1a3b; color: #f472b6; }
+.badge-ph { background: #1a3340; color: #22d3ee; }
+.badge-moisture { background: #3b2e1a; color: #fb923c; }
+.badge-conductivity { background: #1a2e3b; color: #38bdf8; }
+.badge-balance { background: #2e3b1a; color: #a3e635; }
+.badge-titration { background: #3b1a2e; color: #e879f9; }
+.badge-dissolution { background: #1a3b3b; color: #2dd4bf; }
+.badge-viscosity { background: #3b351a; color: #fcd34d; }
+.badge-aas { background: #2e1a3b; color: #c084fc; }
+.severity-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.dot-high { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+.dot-medium { background: #f59e0b; }
+.dot-low { background: #22c55e; }
+.severity-text { font-size: 12px; color: #64748b; }
+.cause-count { font-size: 12px; color: #475569; }
+.fault-arrow { color: #475569; font-size: 14px; transition: transform 0.2s; flex-shrink: 0; }
+.fault-card.open .fault-arrow { transform: rotate(180deg); color: #3b82f6; }
+.fault-card-body { display: none; padding: 0 18px 16px; border-top: 1px solid #334155; }
+.fault-card.open .fault-card-body { display: block; }
+.section-title { font-size: 13px; font-weight: 600; color: #60a5fa; margin: 14px 0 8px; display: flex; align-items: center; gap: 6px; }
+.section-title:first-child { margin-top: 16px; }
+.cause-list, .step-list { list-style: none; }
+.cause-list li { position: relative; padding: 4px 0 4px 18px; font-size: 13px; color: #cbd5e1; line-height: 1.6; }
+.cause-list li::before { content: "\2022"; position: absolute; left: 4px; color: #64748b; }
+.step-list { counter-reset: step; }
+.step-list li { position: relative; padding: 6px 0 6px 32px; font-size: 13px; color: #cbd5e1; line-height: 1.6; counter-increment: step; }
+.step-list li::before { content: counter(step); position: absolute; left: 0; top: 6px; width: 22px; height: 22px; background: #334155; color: #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.fault-card.open .step-list li::before { background: #1e3a5f; color: #60a5fa; }
+.safety-box { background: #1c1408; border-left: 3px solid #f59e0b; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 14px 0 4px; font-size: 13px; color: #fbbf24; line-height: 1.6; }
+.ai-result-panel { display: none; flex-direction: column; height: 100%; }
+.ai-result-panel.active { display: flex; }
+.ai-result-content { flex: 1; overflow-y: auto; padding: 24px; }
+.ai-result-title { font-size: 18px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+.ai-result-question { font-size: 14px; color: #60a5fa; margin-bottom: 20px; padding: 12px 16px; background: #1e3a5f; border-radius: 8px; }
+.ai-result-section { margin-bottom: 20px; }
+.ai-result-section h3 { font-size: 14px; color: #60a5fa; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ai-result-section ul { list-style: none; padding: 0; }
+.ai-result-section ul li { padding: 6px 0 6px 16px; font-size: 14px; color: #cbd5e1; line-height: 1.6; position: relative; }
+.ai-result-section ul li::before { content: "\2022"; position: absolute; left: 0; color: #475569; }
+.ai-result-steps ol { padding-left: 0; list-style: none; counter-reset: step; }
+.ai-result-steps ol li { padding: 8px 0 8px 36px; font-size: 14px; color: #cbd5e1; line-height: 1.6; position: relative; counter-increment: step; }
+.ai-result-steps ol li::before { content: counter(step); position: absolute; left: 0; top: 8px; width: 24px; height: 24px; background: #1e3a5f; color: #60a5fa; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+.ai-result-safety { background: #1c1408; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 16px; font-size: 13px; color: #fbbf24; line-height: 1.6; }
+.ai-result-severity { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; margin-bottom: 16px; }
+.sev-high { background: rgba(239,68,68,0.15); color: #f87171; }
+.sev-medium { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.sev-low { background: rgba(34,197,94,0.15); color: #4ade80; }
+.ai-recommend { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+.ai-recommend:hover { border-color: #3b82f6; background: #283548; }
+.ai-recommend-title { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
+.ai-recommend-meta { display: flex; gap: 8px; font-size: 12px; color: #64748b; }
+.ai-no-result { text-align: center; padding: 60px 20px; color: #475569; }
+.ai-no-result .icon { font-size: 48px; margin-bottom: 16px; }
+.empty-state { text-align: center; padding: 80px 20px; color: #475569; }
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: #2d3a4d; }
+/* Modal */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+.modal-overlay.active { display: flex; }
+.modal-dialog { background: #1e293b; border: 1px solid #334155; border-radius: 14px; width: 560px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-header { padding: 18px 24px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { font-size: 17px; font-weight: 700; color: #f1f5f9; }
+.modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: #334155; color: #94a3b8; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.modal-close:hover { background: #475569; color: #f1f5f9; }
+.modal-body { padding: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 6px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; }
+.form-group textarea { min-height: 90px; resize: vertical; }
+.form-group input::placeholder, .form-group textarea::placeholder { color: #475569; }
+.form-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #334155; }
+.btn-submit { flex: 1; padding: 11px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.btn-submit:hover { background: #2563eb; }
+.btn-submit:disabled { background: #475569; cursor: not-allowed; }
+.btn-reset { padding: 11px 20px; background: transparent; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+.btn-reset:hover { background: #334155; color: #e2e8f0; }
+.form-status { display: none; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 14px; }
+.form-status.success { display: block; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+.form-status.error { display: block; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+.form-loading { display: none; text-align: center; padding: 10px; color: #64748b; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand"><h1>\u{1F52C} 仪器故障诊断</h1><p>故障排查与处理指南</p></div>
+  <div class="sidebar-nav" id="sidebarNav"><div class="nav-section-title">仪器分类</div></div>
+</div>
+
+<div class="main">
+  <div class="toolbar">
+    <div class="search-box"><input type="text" id="searchInput" placeholder="搜索故障名称、原因或排查步骤..."></div>
+    <div class="toolbar-right">
+      <button class="mode-btn active" id="btnSearch" onclick="setMode('search')">\u{1F50D} 搜索</button>
+      <button class="mode-btn" id="btnAI" onclick="setMode('ai')">\u{1F916} AI 问答</button>
+      <button class="mode-btn" id="btnAdd" onclick="showAddDialog()">\u{2795} 录入</button>
+    </div>
+  </div>
+  <div class="content-area" id="contentArea"></div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2>\u{2795} 录入新故障</h2>
+      <button class="modal-close" onclick="closeAddDialog()">\u2715</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>仪器名称</label>
+        <select id="formCategory">
+          <option value="GC">GC - 气相色谱</option>
+          <option value="HPLC">HPLC - 液相色谱</option>
+          <option value="ICP">ICP - 电感耦合等离子体</option>
+          <option value="TOC">TOC - 总有机碳</option>
+          <option value="UV-Vis">UV-Vis - 紫外可见</option>
+          <option value="pH">pH - pH计</option>
+          <option value="水分">水分 - 水分测定仪</option>
+          <option value="电导率">电导率 - 电导率仪</option>
+          <option value="天平">天平</option>
+          <option value="滴定">滴定 - 自动滴定</option>
+          <option value="溶出">溶出 - 溶出仪</option>
+          <option value="粘度">粘度 - 旋转粘度计</option>
+          <option value="AAS">AAS - 原子吸收</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>故障表现形式</label>
+        <input type="text" id="formTitle" placeholder="例如：GC 基线漂移，峰拖尾">
+      </div>
+      <div class="form-group">
+        <label>可能原因及排查方式</label>
+        <textarea id="formCauses" placeholder="每行一个原因和排查方法，例如：&#10;色谱柱污染 → 检查并老化色谱柱&#10;检测器温度不稳 → 确认温控设定"></textarea>
+      </div>
+      <div class="form-group">
+        <label>解决方式</label>
+        <textarea id="formSteps" placeholder="具体的解决步骤，例如：&#10;1. 更换色谱柱&#10;2. 老化色谱柱30分钟&#10;3. 注入标准样验证"></textarea>
+      </div>
+      <div class="form-group">
+        <label>安全提醒（选填）</label>
+        <input type="text" id="formSafety" placeholder="如有安全注意事项请填写">
+      </div>
+      <div class="form-actions">
+        <button class="btn-submit" id="btnSubmit" onclick="submitFault()">\u{1F4E4} 提交并上传到云端</button>
+        <button class="btn-reset" onclick="closeAddDialog()">取消</button>
+      </div>
+      <div class="form-loading" id="formLoading">\u23F3 正在上传到 GitHub，请稍候...</div>
+      <div class="form-status" id="formStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FAULTS_JSON_URL = "https://raw.githubusercontent.com/JH05326/CJT/refs/heads/main/%E4%BB%AA%E5%99%A8%E6%95%85%E9%9A%9C%E6%95%B0%E6%8D%AE%E5%BA%93";
+const GITHUB_TOKEN = "github_pat_11TJZ2K7Q0C3u5tBf73G6b_VcIx2Mw4t0xY0k3p8aL2x5ZnQy7BhM3j5Yp3K5g7mQw2N8vX0pL6R4t";
+
+var faultDB = [];
+var currentCategory = "all";
+var searchQuery = "";
+var currentMode = "search";
+
+var catIcons = {"GC":"\u{1F52C}","HPLC":"\u{1F4A7}","ICP":"\u26A1","TOC":"\u{1F9EA}","UV-Vis":"\u{1F308}","pH":"\u2697\uFE0F","水分":"\u{1F4A8}","电导率":"\u26A1","天平":"\u2696\uFE0F","滴定":"\u{1F9EB}","溶出":"\u{1F504}","粘度":"\u{1FAD7}","AAS":"\u{1F534}"};
+var catClassMap = {"GC":"gc","HPLC":"hplc","ICP":"icp","TOC":"toc","UV-Vis":"uv","pH":"ph","水分":"moisture","电导率":"conductivity","天平":"balance","滴定":"titration","溶出":"dissolution","粘度":"viscosity","AAS":"aas"};
+
+var FALLBACK_FAULTS = [
+{"id":1,"category":"GC","title":"GC 基线漂移","severity":"medium","causes":["色谱柱未平衡","检测器温度不稳","载气流速波动","色谱柱污染"],"steps":["检查色谱柱是否已充分平衡（至少30分钟）","确认检测器温度设定稳定，无波动","检查载气压力/流速是否稳定","如上述正常，可能是色谱柱污染，需要老化或更换"],"safety":"更换色谱柱前确保系统已降温至室温"},
+{"id":2,"category":"GC","title":"GC 峰形异常（拖尾/分叉）","severity":"medium","causes":["进样口衬管污染","色谱柱安装不当","进样量过大","活性位点吸附"],"steps":["检查并更换进样口衬管（去活衬管）","检查色谱柱两端安装位置是否正确，插到合适深度","减少进样量，尝试分流模式","检查系统是否有活性位点（如O型圈老化）"],"safety":""},
+{"id":3,"category":"GC","title":"GC 保留时间漂移","severity":"low","causes":["柱温箱温度波动","载气流速变化","柱温程序设置问题","色谱柱流失"],"steps":["检查柱温箱门是否关严，确认温度精度","用流量计校准载气流速","核对柱温程序是否有修改","如色谱柱使用时间较长，考虑柱流失，需老化或更换"],"safety":""},
+{"id":4,"category":"GC","title":"GC 无信号/信号极低","severity":"high","causes":["检测器未点火(FID)","检测器头堵塞","气体流量错误","检测器连接线断裂"],"steps":["FID检测器：检查是否点火，氢气和空气流量是否正确","检查检测器收集极/极化板是否堵塞，需要清洗","核对H2、Air、Make-up gas的流量设定","检查检测器信号线连接是否正常","尝试注入标准样确认是否恢复"],"safety":"FID点火前确保氢气流量正常，避免氢气积聚"},
+{"id":5,"category":"HPLC","title":"HPLC 系统压力过高","severity":"high","causes":["色谱柱堵塞","流动相过滤头堵塞","管路堵塞","梯度阀故障"],"steps":["断开色谱柱，直接通管路看压力是否下降","如压力下降，说明色谱柱堵塞，尝试反冲或更换","检查流动相过滤头，超声清洗或更换","检查管路是否有结晶或凝胶堵塞","如以上都正常，考虑梯度阀故障，需维护"],"safety":"降压后再拆卸管路，避免高压液体喷溅"},
+{"id":6,"category":"HPLC","title":"HPLC 压力波动/流量不稳","severity":"medium","causes":["单向阀故障","泵头有气泡","密封圈磨损","流动相比例不对"],"steps":["打开排气阀，超声或手动排气","检查单向阀是否有污染，用异丙醇超声清洗","检查泵密封圈的磨损情况，必要时更换","检查流动相配制是否正确，是否含有挥发性组分"],"safety":"排气时注意防止有机溶剂溅出"},
+{"id":7,"category":"HPLC","title":"HPLC 峰面积重复性差","severity":"medium","causes":["进样器故障","进样量不准","柱温不稳定","流动相配制误差"],"steps":["检查自动进样器针位是否正确，针是否堵塞","检查进样瓶是否放置到位，液位检测是否正常","确认柱温箱温度稳定","检查流动相配制和脱气是否规范","用标准样连续进样6针，计算RSD"],"safety":""},
+{"id":8,"category":"ICP","title":"ICP 等离子体点不着","severity":"high","causes":["冷却气流量不足","射频发生器故障","点火线圈问题","采样锥堵塞"],"steps":["检查氩气压力是否足够（主气\u22650.6MPa）","检查冷却气、辅助气、载气流速是否正常","观察点火线圈是否有火花，尝试重新点火","检查雾化室和喷雾器是否堵塞","如仍点不着，可能是射频发生器故障，联系工程师"],"safety":"点火失败后等待1-2分钟再重试，避免氩气积聚"},
+{"id":9,"category":"ICP","title":"ICP 灵敏度下降","severity":"medium","causes":["雾化器堵塞","锥孔污染/堵塞","等离子体功率不足","样品管路污染"],"steps":["检查雾化器是否堵塞，超声清洗或更换","检查采样锥和截取锥孔是否堵塞，需要清洗或更换","确认射频功率设定是否正常","检查蠕动泵管是否老化变形，需要更换","用标准样测试确认灵敏度变化"],"safety":"更换锥之前确保仪器已关闭并冷却"},
+{"id":10,"category":"ICP","title":"ICP 氧化物偏高 (CeO+/Ce+) 超标","severity":"low","causes":["等离子体功率偏低","气体流量不合理","雾化效率低","锥孔部分堵塞"],"steps":["适当增加射频功率","检查并优化载气/辅助气流量","检查雾化器效率，确保正常喷雾","检查锥孔是否有部分堵塞","优化积分时间和采样深度"],"safety":""},
+{"id":11,"category":"TOC","title":"TOC 测量值偏低","severity":"medium","causes":["催化剂失效","燃烧管堵塞","进样量不足","标准液过期"],"steps":["检查催化剂是否失效，需要更换","检查燃烧管是否堵塞或老化","确认进样量是否准确，检查进样针和管路","检查标准溶液是否过期或污染","做回收率测试验证"],"safety":"更换催化剂时注意高温烫伤"},
+{"id":12,"category":"TOC","title":"TOC 空白值偏高","severity":"medium","causes":["管路污染","试剂污染","空气中的CO2溶入","样品瓶不洁"],"steps":["用高纯水冲洗进样管路至少10次","检查酸试剂和氧化剂是否被污染，更换新试剂","样品酸化后尽快分析，减少CO2溶入","更换洁净的样品瓶重新测试","做空白试验确认"],"safety":"使用浓盐酸酸化时注意防护"},
+{"id":13,"category":"UV-Vis","title":"UV-Vis 波长准确性偏差","severity":"low","causes":["光栅位移","钬玻璃标准片老化","检测器漂移"],"steps":["使用钬玻璃或镨钕滤光片进行波长校正","运行仪器自检/校正程序","如偏差持续，可能需要专业人员调整光栅"],"safety":""},
+{"id":14,"category":"UV-Vis","title":"UV-Vis 吸光度不准确","severity":"medium","causes":["比色皿不匹配/污染","灯能量衰减","基线未校准","狭缝宽度不当"],"steps":["清洗比色皿，检查是否有划痕，配对测试","检查氘灯/钨灯使用时间，能量是否不足","用空气或空白重新做基线校正","检查狭缝宽度设置是否合适"],"safety":"比色皿清洗使用适当溶剂，不要用硬物擦拭"},
+{"id":15,"category":"pH","title":"pH计校准失败","severity":"medium","causes":["电极老化/干涸","缓冲液过期","电极污染","接线松动"],"steps":["检查电极是否为干放状态，需浸泡活化（3.3M KCl或pH4缓冲液）2小时","更换新的标准缓冲液重新校准","用温和洗涤剂清洗电极敏感球泡","检查电极接线和BNC接口是否松动","如校准斜率低于95%，考虑更换电极"],"safety":""},
+{"id":16,"category":"pH","title":"pH计读数漂移不稳","severity":"low","causes":["电极响应慢","温度补偿异常","样品本身不稳定","参比液流速过快/过慢"],"steps":["检查电极响应时间，充分搅拌但避免气泡","确认温度补偿探头正常工作","有些样品本身pH会随时间变化，快速读数","检查参比液流速（玻璃参比应缓慢渗出）"],"safety":""},
+{"id":17,"category":"水分","title":"水分测定仪结果偏低","severity":"medium","causes":["加热温度不足","样品未完全干燥","称量误差","环境湿度影响"],"steps":["检查加热模块温度是否达到设定值，做温度验证","确认干燥时间是否足够，做恒重测试","检查天平校准状态和称量准确性","样品在称量过程中注意防潮，缩短暴露时间"],"safety":""},
+{"id":18,"category":"水分","title":"水分测定仪结果偏高","severity":"medium","causes":["加热温度过高导致样品分解","样品含结晶水","样品飞溅","环境通风不良"],"steps":["降低加热温度，确认样品在设定温度下不分解","了解样品性质，判断是否含有结晶水","检查样品盘是否放置正确，避免加热时飞溅","检查仪器通风状况"],"safety":"温度过高可能导致某些样品剧烈分解"},
+{"id":19,"category":"电导率","title":"电导率仪读数偏高","severity":"low","causes":["电极污染","温度补偿设置错误","标准液污染","电极常数错误"],"steps":["用去离子水清洗电极，必要时用稀酸或清洗剂清洗","检查温度补偿设置是否正确","更换新的电导率标准液校准","确认电极常数（K=1或K=0.1）设置与电极匹配"],"safety":""},
+{"id":20,"category":"天平","title":"天平称量不稳定","severity":"medium","causes":["水平未调好","有气流干扰","样品带静电","秤盘有污染物"],"steps":["检查水平泡是否在中心，调节调平脚","关闭防风门，远离空调/通风口","使用防静电设备或离子风机","清洁秤盘和防风门内壁"],"safety":""},
+{"id":21,"category":"滴定","title":"自动滴定终点判断偏差大","severity":"medium","causes":["电极响应慢","滴定速度过快","样品浓度不合适","试剂失效"],"steps":["检查pH/指示电极响应是否正常，活化或更换","降低接近终点时的滴定速度","确认样品浓度在合适范围内","更换新鲜的标准滴定溶液"],"safety":""},
+{"id":22,"category":"溶出","title":"溶出曲线形状异常","severity":"medium","causes":["转速不准","温度控制不佳","桨杆垂直度偏差","样品放置方式不当"],"steps":["用转速计校准搅拌桨转速","确认溶出介质温度控制在\u00B10.5\u2103以内","检查搅拌桨/篮的垂直度","确认药片在容器中的位置是否正确"],"safety":""},
+{"id":23,"category":"粘度","title":"旋转粘度计读数不稳定","severity":"low","causes":["样品中有气泡","转子不垂直","转速未稳定","样品温度不均"],"steps":["样品静置消除气泡，或低速预搅","检查转子连接是否垂直，液面是否在标记处","等待转速稳定后再读数（一般30秒）","确保样品温度均匀（水浴恒温）"],"safety":""},
+{"id":24,"category":"AAS","title":"AAS 灯能量不足","severity":"medium","causes":["空心阴极灯老化","灯电流设置过高","光学系统偏移"],"steps":["检查空心阴极灯使用时间，判断是否老化","适当降低灯电流（在保证信号强度前提下）","重新调整灯的位置和高度","更换新的空心阴极灯测试"],"safety":"空心阴极灯属于高压元件，更换时注意断电"},
+{"id":25,"category":"AAS","title":"AAS 灵敏度低","severity":"medium","causes":["狭缝宽度不当","雾化器故障","燃气比例不当","元素灯不对"],"steps":["使用推荐狭缝宽度，尝试增大狭缝","检查雾化器效率和废液排放是否正常","优化燃气（乙炔）和助燃气（笑气/空气）比例","确认选择了正确的元素灯和波长"],"safety":"乙炔为易燃易爆气体，注意通风和安全"}
+];
+
+function getCategories() {
+  var counts = {};
+  faultDB.forEach(function(f) { counts[f.category] = (counts[f.category]||0)+1; });
+  return Object.keys(counts).sort();
+}
+
+function renderSidebar() {
+  var nav = document.getElementById("sidebarNav");
+  var cats = getCategories();
+  var html = '<div class="nav-item active" data-cat="all"><span class="nav-icon">\u{1F4CB}</span>全部<span class="nav-count">' + faultDB.length + '</span></div>';
+  html += '<div class="nav-section-title">仪器分类</div>';
+  cats.forEach(function(c) {
+    html += '<div class="nav-item" data-cat="' + c + '"><span class="nav-icon">' + (catIcons[c]||"\u{1F527}") + '</span>' + c + '<span class="nav-count">' + (counts[c]||0) + '</span></div>';
+  });
+  nav.innerHTML = html;
+  nav.querySelectorAll(".nav-item").forEach(function(item) {
+    item.addEventListener("click", function() {
+      nav.querySelectorAll(".nav-item").forEach(function(i) { i.classList.remove("active"); });
+      item.classList.add("active");
+      currentCategory = item.dataset.cat;
+      if (currentMode === "ai") setMode("search");
+      renderFaults();
+    });
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById("btnSearch").classList.toggle("active", mode === "search");
+  document.getElementById("btnAI").classList.toggle("active", mode === "ai");
+  var si = document.getElementById("searchInput");
+  if (mode === "search") {
+    si.placeholder = "搜索故障名称、原因或排查步骤...";
+    si.focus();
+    renderFaults();
+  } else {
+    si.placeholder = "描述你的仪器故障，如：GC基线漂移怎么办...";
+    si.focus();
+    si.value = "";
+    document.getElementById("contentArea").innerHTML = '<div class="ai-no-result"><div class="icon">\u{1F916}</div><p>输入你的故障描述，AI帮你诊断</p></div>';
+  }
+}
+
+function aiSearch(query) {
+  if (!query.trim()) return;
+  var q = query.toLowerCase();
+  var scored = faultDB.map(function(f) {
+    var score = 0;
+    if (f.title.toLowerCase().indexOf(q) >= 0) score += 100;
+    else { var chars = f.title.toLowerCase().split(""); chars.forEach(function(ch) { if (ch.length > 1 && q.indexOf(ch) >= 0) score += 50; }); }
+    if (q.indexOf(f.category.toLowerCase()) >= 0) score += 40;
+    f.causes.forEach(function(c) { if (c.toLowerCase().indexOf(q) >= 0) score += 20; });
+    f.steps.forEach(function(s) { if (s.toLowerCase().indexOf(q) >= 0) score += 15; });
+    return { id: f.id, title: f.title, category: f.category, severity: f.severity, causes: f.causes, steps: f.steps, safety: f.safety, score: score };
+  }).filter(function(f) { return f.score > 0; }).sort(function(a, b) { return b.score - a.score; });
+
+  if (scored.length === 0) {
+    document.getElementById("contentArea").innerHTML = '<div class="ai-no-result"><div class="icon">\u{1F914}</div><p>暂时没找到匹配的故障记录<br><span style="font-size:12px">试试其他关键词，或切换搜索模式</span></p></div>';
+    return;
+  }
+  var top = scored[0], others = scored.slice(1, 5);
+  var html = '<div class="ai-result-panel active"><div class="ai-result-content">';
+  html += '<div class="ai-result-title">\u{1F52C} AI 诊断结果</div>';
+  html += '<div class="ai-result-question">\u2753 你的问题："' + escapeHtml(query) + '"</div>';
+  html += '<div class="ai-result-section"><h3>\u{1F3AF} 最可能的故障：' + top.title + '</h3>';
+  var sevText = top.severity === "high" ? "\u{1F534} 紧急" : top.severity === "medium" ? "\u{1F7E1} 一般" : "\u{1F7E2} 轻微";
+  var sevClass = top.severity === "high" ? "sev-high" : top.severity === "medium" ? "sev-medium" : "sev-low";
+  html += '<div class="ai-result-severity ' + sevClass + '">' + sevText + '</div>';
+  html += '<div class="ai-result-section"><h3>\u{1F50D} 可能原因</h3><ul>';
+  top.causes.forEach(function(c) { html += '<li>' + c + '</li>'; });
+  html += '</ul></div>';
+  html += '<div class="ai-result-section ai-result-steps"><h3>\u{1F527} 排查步骤</h3><ol>';
+  top.steps.forEach(function(s) { html += '<li>' + s + '</li>'; });
+  html += '</ol></div>';
+  if (top.safety) html += '<div class="ai-result-safety">\u26A0\uFE0F ' + top.safety + '</div>';
+  html += '</div>';
+  if (others.length > 0) {
+    html += '<div class="ai-result-section"><h3>\u{1F4CB} 相关故障</h3>';
+    others.forEach(function(f) {
+      var st = f.severity === "high" ? "\u{1F534}" : f.severity === "medium" ? "\u{1F7E1}" : "\u{1F7E2}";
+      html += '<div class="ai-recommend" onclick="expandFault(' + f.id + ')"><div class="ai-recommend-title">' + f.category + ' - ' + f.title + '</div><div class="ai-recommend-meta"><span class="' + st + '"></span>' + f.causes.length + '个原因</div></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  document.getElementById("contentArea").innerHTML = html;
+}
+
+function expandFault(id) {
+  var f = faultDB.find(function(x) { return x.id === id; });
+  if (!f) return;
+  var sevText = f.severity === "high" ? "\u{1F534} 紧急" : f.severity === "medium" ? "\u{1F7E1} 一般" : "\u{1F7E2} 轻微";
+  var sevClass = f.severity === "high" ? "sev-high" : f.severity === "medium" ? "sev-medium" : "sev-low";
+  var html = '<div class="ai-result-panel active"><div class="ai-result-content">';
+  html += '<div class="ai-result-title">\u{1F52C} ' + f.title + '</div>';
+  html += '<div class="ai-result-severity ' + sevClass + '">' + sevText + '</div>';
+  html += '<div class="ai-result-section"><h3>\u{1F50D} 可能原因</h3><ul>';
+  f.causes.forEach(function(c) { html += '<li>' + c + '</li>'; });
+  html += '</ul></div>';
+  html += '<div class="ai-result-section ai-result-steps"><h3>\u{1F527} 排查步骤</h3><ol>';
+  f.steps.forEach(function(s) { html += '<li>' + s + '</li>'; });
+  html += '</ol></div>';
+  if (f.safety) html += '<div class="ai-result-safety">\u26A0\uFE0F ' + f.safety + '</div>';
+  html += '</div></div>';
+  document.getElementById("contentArea").innerHTML = html;
+}
+
+function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>"); }
+
+function renderFaults() {
+  var area = document.getElementById("contentArea");
+  var filtered = faultDB.filter(function(f) {
+    var matchCat = currentCategory === "all" || f.category === currentCategory;
+    var matchSearch = !searchQuery || f.title.toLowerCase().indexOf(searchQuery) >= 0 || f.category.toLowerCase().indexOf(searchQuery) >= 0 || f.causes.some(function(c) { return c.toLowerCase().indexOf(searchQuery) >= 0; }) || f.steps.some(function(s) { return s.toLowerCase().indexOf(searchQuery) >= 0; });
+    return matchCat && matchSearch;
+  });
+  area.innerHTML = '';
+  var stats = document.createElement("div");
+  stats.className = "toolbar-stats";
+  stats.style.cssText = "padding:0 24px 8px;";
+  stats.innerHTML = '共 <span>' + faultDB.length + '</span> 条 &nbsp;|&nbsp; 显示 <span>' + filtered.length + '</span> 条';
+  area.appendChild(stats);
+  if (filtered.length === 0) {
+    area.innerHTML += '<div class="empty-state"><div class="icon">\u{1F50D}</div><p>没有找到匹配的故障记录</p></div>';
+    return;
+  }
+  filtered.forEach(function(f) {
+    var sevText = f.severity === "high" ? "紧急" : f.severity === "medium" ? "一般" : "轻微";
+    var badgeClass = "badge-" + (catClassMap[f.category] || "gc");
+    var card = document.createElement("div");
+    card.className = "fault-card";
+    card.id = "card-" + f.id;
+    card.innerHTML = '<div class="fault-card-header" onclick="toggleCard(' + f.id + ')"><div class="fault-card-left"><div class="fault-title">' + f.title + '</div><div class="fault-meta"><span class="fault-badge ' + badgeClass + '">' + f.category + '</span><span><span class="severity-dot dot-' + f.severity + '"></span><span class="severity-text">' + sevText + '</span></span><span class="cause-count">' + f.causes.length + ' 个原因</span></div></div><span class="fault-arrow">\u25BC</span></div><div class="fault-card-body"><div class="section-title">\u{1F50D} 可能原因</div><ul class="cause-list">' + f.causes.map(function(c) { return '<li>' + c + '</li>'; }).join("") + '</ul><div class="section-title">\u{1F527} 排查步骤</div><ol class="step-list">' + f.steps.map(function(s) { return '<li>' + s + '</li>'; }).join("") + '</ol>' + (f.safety ? '<div class="safety-box">\u26A0\uFE0F ' + f.safety + '</div>' : '') + '</div>';
+    area.appendChild(card);
+  });
+}
+
+function toggleCard(id) {
+  document.getElementById("card-" + id).classList.toggle("open");
+}
+
+document.getElementById("searchInput").addEventListener("input", function(e) {
+  searchQuery = e.target.value.toLowerCase().trim();
+  if (currentMode === "search") renderFaults();
+  else aiSearch(e.target.value.trim());
+});
+document.getElementById("searchInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && currentMode === "ai") aiSearch(e.target.value.trim());
+});
+
+function showAddDialog() {
+  document.getElementById("addModal").classList.add("active");
+  document.getElementById("formTitle").focus();
+}
+function closeAddDialog() {
+  document.getElementById("addModal").classList.remove("active");
+  resetForm();
+}
+document.addEventListener("DOMContentLoaded", function() {
+  var overlay = document.getElementById("addModal");
+  if (overlay) overlay.addEventListener("click", function(e) { if (e.target === overlay) closeAddDialog(); });
+});
+
+async function submitFault() {
+  var title = document.getElementById("formTitle").value.trim();
+  var category = document.getElementById("formCategory").value;
+  var causesText = document.getElementById("formCauses").value.trim();
+  var stepsText = document.getElementById("formSteps").value.trim();
+  var safety = document.getElementById("formSafety").value.trim();
+  if (!title) { showFormStatus("请填写故障表现形式", "error"); return; }
+  if (!causesText) { showFormStatus("请填写可能原因及排查方式", "error"); return; }
+  if (!stepsText) { showFormStatus("请填写解决方式", "error"); return; }
+  var causes = causesText.split("\n").map(function(s) { return s.trim(); }).filter(Boolean);
+  var steps = stepsText.split("\n").map(function(s) { return s.trim(); }).filter(Boolean);
+  if (causes.length === 0 || steps.length === 0) { return; }
+  var loading = document.getElementById("formLoading");
+  var submitBtn = document.getElementById("btnSubmit");
+  loading.style.display = "block";
+  submitBtn.disabled = true;
+  var statusEl = document.getElementById("formStatus");
+  statusEl.style.display = "none";
+  statusEl.className = "form-status";
+  try {
+    console.log("\u{1F4E5} Reading cloud DB...");
+    var resp = await fetch(FAULTS_JSON_URL);
+    if (!resp.ok) throw new Error("无法读取云端数据 (HTTP " + resp.status + ")");
+    var data = await resp.json();
+    console.log("\u2705 Read " + data.length + " records");
+    var maxId = data.reduce(function(max, f) { return Math.max(max, f.id || 0); }, 0);
+    var newFault = { id: maxId + 1, category: category, title: title, severity: "medium", causes: causes, steps: steps, safety: safety || "" };
+    data.push(newFault);
+    console.log("\u{1F4E4} Uploading...");
+    var filePath = "%E4%BB%AA%E5%99%A8%E6%95%85%E9%9A%9C%E6%95%B0%E6%8D%AE%E5%BA%93";
+    var branchResp = await fetch("https://api.github.com/repos/JH05326/CJT/branches/main", {
+      headers: { "Authorization": "token " + GITHUB_TOKEN, "X-GitHub-Api-Version": "2022-11-28" }
+    });
+    var sha;
+    if (branchResp.ok) { sha = (await branchResp.json()).commit.sha; }
+    else throw new Error("无法获取分支信息 (HTTP " + branchResp.status + ")");
+    var putResp = await fetch("https://api.github.com/repos/JH05326/CJT/contents/" + filePath, {
+      method: "PUT",
+      headers: { "Authorization": "token " + GITHUB_TOKEN, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "feat: add fault - " + title, content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))), sha: sha, branch: "main" })
+    });
+    if (!putResp.ok) {
+      var errMsg = "上传失败 (HTTP " + putResp.status + ")";
+      try { var ed = await putResp.json(); errMsg = ed.message || errMsg; } catch(e) {}
+      throw new Error(errMsg);
+    }
+    console.log("\u2705 Upload successful");
+    loading.style.display = "none";
+    showFormStatus("\u2705 提交成功！新增故障「" + title + "」已上传到云端，共 " + data.length + " 条。", "success");
+    resetForm();
+    setTimeout(function() { closeAddDialog(); }, 2500);
+    await loadFaults();
+  } catch (err) {
+    loading.style.display = "none";
+    console.error("\u274C Error:", err);
+    showFormStatus("\u274C 提交失败：" + err.message, "error");
+  } finally {
+    submitBtn.disabled = false;
+  }
+}
+
+function showFormStatus(msg, type) {
+  var el = document.getElementById("formStatus");
+  el.className = "form-status " + type;
+  el.textContent = msg;
+}
+
+function resetForm() {
+  document.getElementById("formTitle").value = "";
+  document.getElementById("formCauses").value = "";
+  document.getElementById("formSteps").value = "";
+  document.getElementById("formSafety").value = "";
+  document.getElementById("formCategory").selectedIndex = 0;
+  document.getElementById("formStatus").style.display = "none";
+  document.getElementById("formStatus").className = "form-status";
+}
+
+async function loadFaults() {
+  try {
+    var resp = await fetch(FAULTS_JSON_URL);
+    if (resp.ok) {
+      faultDB = await resp.json();
+      console.log("\u2705 Cloud DB loaded: " + faultDB.length + " records");
+    } else { throw new Error("HTTP " + resp.status); }
+  } catch (err) {
+    console.warn("\u26A0 Failed to load cloud DB, using fallback: " + err.message);
+    faultDB = FALLBACK_FAULTS;
+  }
+  renderSidebar();
+  renderFaults();
+}
+
+loadFaults();
+</script>
+</body>
+</html>
